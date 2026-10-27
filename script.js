@@ -1,5 +1,46 @@
 // ─── Coda rapportini ───
 let coda = [];
+let editIndex = -1; // -1 = nuovo, >= 0 = modifica
+
+// ─── Partecipanti ───
+let partecipanti = [];
+
+function aggiungiPartecipante() {
+  const input = document.getElementById('partecipanteInput');
+  const nome = input.value.trim();
+  if (!nome) return;
+  if (partecipanti.includes(nome)) { toast('Partecipante già aggiunto', false); return; }
+  partecipanti.push(nome);
+  input.value = '';
+  renderPartecipanti();
+}
+
+function rimuoviPartecipante(idx) {
+  partecipanti.splice(idx, 1);
+  renderPartecipanti();
+}
+
+function renderPartecipanti() {
+  const list = document.getElementById('partecipantiList');
+  const countEl = document.getElementById('count-partecipanti');
+  if (!partecipanti.length) {
+    list.innerHTML = '';
+    countEl.textContent = '';
+    return;
+  }
+  countEl.textContent = partecipanti.length + ' partecipant' + (partecipanti.length === 1 ? 'e' : 'i');
+  list.innerHTML = partecipanti.map((p, i) =>
+    '<span class="tag-partecipante">' + p + '<button class="tag-remove" onclick="rimuoviPartecipante(' + i + ')" title="Rimuovi">✕</button></span>'
+  ).join('');
+}
+
+// Enter key per aggiungere partecipante
+document.addEventListener('DOMContentLoaded', function() {
+  const pi = document.getElementById('partecipanteInput');
+  if (pi) pi.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') { e.preventDefault(); aggiungiPartecipante(); }
+  });
+});
 
 // ─── Allegati ───
 const allegati = { ricambi: [], impianti: [] };
@@ -14,13 +55,13 @@ function addFiles(tipo, input) {
         name: file.name,
         type: file.type,
         size: file.size,
-        data: e.target.result // base64 data URI
+        data: e.target.result
       });
       renderAllegati(tipo);
     };
     reader.readAsDataURL(file);
   });
-  input.value = ''; // reset per poter ri-selezionare lo stesso file
+  input.value = '';
 }
 
 function removeFile(tipo, idx) {
@@ -97,26 +138,70 @@ function renderCoda() {
       <div class="queue-info">
         <div class="qi-title">${r.unita} — ${r.impianto}</div>
         <div class="qi-detail">${r.statoLavoro} · ${r.oreLavorate}h · ${r.responsabileNome}</div>
+        ${r.partecipanti && r.partecipanti.length ? '<div class="qi-detail">👥 ' + r.partecipanti.join(', ') + '</div>' : ''}
         <div class="qi-id">${r.id}</div>
         ${(r.allegatiRicambi && r.allegatiRicambi.length) || (r.allegatiImpianti && r.allegatiImpianti.length) ? '<div class="queue-attach-info">' + (r.allegatiRicambi && r.allegatiRicambi.length ? '<span>📷 Ricambi: ' + r.allegatiRicambi.length + '</span>' : '') + (r.allegatiImpianti && r.allegatiImpianti.length ? '<span>📷 Impianti: ' + r.allegatiImpianti.length + '</span>' : '') + '</div>' : ''}
       </div>
-      <button class="btn-remove" onclick="rimuoviDaCoda(${i})" title="Rimuovi">✕</button>
+      <div class="queue-actions-col">
+        <button class="btn-edit" onclick="modificaRapportino(${i})" title="Modifica">✏️</button>
+        <button class="btn-remove" onclick="rimuoviDaCoda(${i})" title="Rimuovi">✕</button>
+      </div>
     </div>`).join('');
 }
 
 function rimuoviDaCoda(idx) {
   coda.splice(idx, 1);
+  if (editIndex === idx) editIndex = -1;
+  else if (editIndex > idx) editIndex--;
   renderCoda();
   toast('Rapportino rimosso dalla coda');
 }
 
 function svuotaCoda() {
   coda = [];
+  editIndex = -1;
   renderCoda();
   toast('Coda svuotata');
 }
 
-// Aggiungi rapportino alla coda
+// ─── Modifica rapportino dalla coda ───
+function modificaRapportino(idx) {
+  const r = coda[idx];
+  editIndex = idx;
+
+  document.getElementById('operatore').value = r.operatore;
+  document.getElementById('data').value = r.data;
+  document.getElementById('unita').value = r.unita;
+  document.getElementById('impianto').value = r.impianto;
+  document.getElementById('statoLavoro').value = r.statoLavoro;
+  document.getElementById('oreLavorate').value = r.oreLavorate;
+  document.getElementById('descrizione').value = r.descrizione;
+  document.getElementById('materialiUsati').value = r.materialiUsati || '';
+  document.getElementById('note').value = r.note || '';
+  document.getElementById('responsabile').value = r.emailResponsabile;
+
+  // Ripristina partecipanti
+  partecipanti = r.partecipanti ? [...r.partecipanti] : [];
+  renderPartecipanti();
+
+  // Ripristina allegati
+  allegati.ricambi = r.allegatiRicambi ? r.allegatiRicambi.map(a => ({...a})) : [];
+  allegati.impianti = r.allegatiImpianti ? r.allegatiImpianti.map(a => ({...a})) : [];
+  renderAllegati('ricambi');
+  renderAllegati('impianti');
+
+  // Cambia il bottone del form
+  const btn = document.querySelector('#rapForm button[type="submit"]');
+  btn.innerHTML = '✏️ Salva Modifiche';
+  btn.classList.remove('btn-add');
+  btn.classList.add('btn-send');
+
+  // Scroll al form
+  document.querySelector('.card').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  toast('Modifica il rapportino e clicca "Salva Modifiche"');
+}
+
+// Aggiungi o salva rapportino
 document.getElementById('rapForm').addEventListener('submit', function(e) {
   e.preventDefault();
 
@@ -124,7 +209,7 @@ document.getElementById('rapForm').addEventListener('submit', function(e) {
   const respNome = sel.options[sel.selectedIndex].dataset.nome || '';
 
   const rap = {
-    id: generateId(),
+    id: editIndex >= 0 ? coda[editIndex].id : generateId(),
     operatore: document.getElementById('operatore').value.trim(),
     data: document.getElementById('data').value,
     unita: document.getElementById('unita').value,
@@ -134,6 +219,7 @@ document.getElementById('rapForm').addEventListener('submit', function(e) {
     descrizione: document.getElementById('descrizione').value.trim(),
     materialiUsati: document.getElementById('materialiUsati').value.trim(),
     note: document.getElementById('note').value.trim(),
+    partecipanti: [...partecipanti],
     approvato: false,
     approvatoDa: '',
     dataApprovazione: '',
@@ -144,9 +230,21 @@ document.getElementById('rapForm').addEventListener('submit', function(e) {
     allegatiImpianti: allegati.impianti.map(a => ({name:a.name, type:a.type, size:a.size, data:a.data}))
   };
 
-  coda.push(rap);
+  if (editIndex >= 0) {
+    coda[editIndex] = rap;
+    toast('Rapportino modificato ✔');
+    editIndex = -1;
+    // Ripristina bottone
+    const btn = document.querySelector('#rapForm button[type="submit"]');
+    btn.innerHTML = '➕ Aggiungi Rapportino alla Coda';
+    btn.classList.remove('btn-send');
+    btn.classList.add('btn-add');
+  } else {
+    coda.push(rap);
+    toast('Rapportino aggiunto alla coda (' + coda.length + ')');
+  }
+
   renderCoda();
-  toast('Rapportino aggiunto alla coda (' + coda.length + ')');
 
   // Reset solo campi lavoro, mantieni operatore/data/responsabile
   const keepOp = document.getElementById('operatore').value;
@@ -160,6 +258,8 @@ document.getElementById('rapForm').addEventListener('submit', function(e) {
   document.getElementById('descrizione').value = '';
   document.getElementById('materialiUsati').value = '';
   document.getElementById('note').value = '';
+  partecipanti = [];
+  renderPartecipanti();
 
   document.getElementById('operatore').value = keepOp;
   document.getElementById('data').value = keepData;
@@ -167,6 +267,24 @@ document.getElementById('rapForm').addEventListener('submit', function(e) {
   resetAllegati();
 
   document.getElementById('queueCard').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+});
+
+// ─── Conferma invio ───
+function confermaInvio() {
+  if (!coda.length) return;
+  const n = coda.length;
+  document.getElementById('modalCount').textContent = n;
+  document.getElementById('modalPlural').textContent = n === 1 ? 'o' : 'i';
+  document.getElementById('modalConferma').hidden = false;
+}
+
+function chiudiModal() {
+  document.getElementById('modalConferma').hidden = true;
+}
+
+// Chiudi modal cliccando fuori
+document.addEventListener('click', function(e) {
+  if (e.target.classList.contains('modal-overlay')) chiudiModal();
 });
 
 // Scarica file .json e apri email
@@ -226,10 +344,11 @@ function inviaRapportini() {
   coda.forEach(r => storico.unshift(r));
   saveStorico(storico);
   coda = [];
+  editIndex = -1;
   renderCoda();
   renderStorico();
 
-  // Web Share API (Android con HTTPS) — allega il file direttamente
+  // Web Share API (Android con HTTPS)
   if (window.isSecureContext && navigator.canShare && navigator.canShare({ files: allFiles })) {
     navigator.share({
       title: 'Rapportini ' + operatore + ' del ' + dataFmt,
@@ -238,11 +357,9 @@ function inviaRapportini() {
     }).then(() => {
       toast(count + ' rapportin' + (count === 1 ? 'o' : 'i') + ' inviati!');
     }).catch(() => {
-      // Se l'utente annulla o fallisce, fallback a download + mailto
       scaricaEInviaFallback(jsonData, filename, operatore, dataFmt, count);
     });
   } else {
-    // Fallback: scarica file + apri mailto
     scaricaEInviaFallback(jsonData, filename, operatore, dataFmt, count);
   }
 }
@@ -256,6 +373,7 @@ function renderStorico() {
       <div>
         <div class="storico-info"><strong>${r.unita}</strong> — ${r.impianto}</div>
         <div class="storico-id">${r.id} · ${fmtDate(r.data)} · ${r.responsabileNome}</div>
+        ${r.partecipanti && r.partecipanti.length ? '<div class="storico-id">👥 ' + r.partecipanti.join(', ') + '</div>' : ''}
       </div>
       <span class="storico-badge">Inviato</span>
     </div>`).join('');

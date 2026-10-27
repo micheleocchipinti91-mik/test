@@ -9,8 +9,8 @@
   <meta name="apple-mobile-web-app-title" content="Rapportini">
   <title>Rapportini Operatore</title>
   <link rel="manifest" href="manifest.json">
-  <link rel="icon" href="icons/icon-192.png" type="image/png">
-  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="icon" href="icon-192.png" type="image/png">
+  <link rel="apple-touch-icon" href="icon-192.png">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
   <link rel="stylesheet" href="style.css">
 </head>
@@ -36,6 +36,16 @@
           <label>Data <span class="req">*</span></label>
           <input type="date" id="data" class="input" required>
         </div>
+      </div>
+
+      <div class="form-group">
+        <label>👥 Partecipanti alla Lavorazione</label>
+        <div style="display:flex;gap:8px;margin-bottom:8px">
+          <input type="text" id="partecipanteInput" class="input" placeholder="Nome e Cognome partecipante" style="flex:1">
+          <button type="button" class="btn-attach" onclick="aggiungiPartecipante()" style="white-space:nowrap;border-style:solid">➕ Aggiungi</button>
+        </div>
+        <div id="partecipantiList" class="partecipanti-tags"></div>
+        <div class="attach-count" id="count-partecipanti"></div>
       </div>
 
       <div class="form-row">
@@ -121,7 +131,7 @@
       <div class="queue-empty">Nessun rapportino in coda. Compila il form e clicca "Aggiungi".</div>
     </div>
     <div class="buttons-row" id="queueActions" hidden>
-      <button class="btn btn-send" onclick="inviaRapportini()" style="flex:2">📨 Scarica File e Invia Email</button>
+      <button class="btn btn-send" onclick="confermaInvio()" style="flex:2">📨 Invia Rapportini</button>
       <button class="btn" onclick="svuotaCoda()" style="flex:1;background:var(--bg);color:var(--danger);border:1px solid var(--danger)">🗑 Svuota</button>
     </div>
   </div>
@@ -129,6 +139,19 @@
   <div class="card">
     <div class="card-title">📋 Storico Rapportini Inviati</div>
     <div id="storico"></div>
+  </div>
+</div>
+
+<!-- Modal conferma invio -->
+<div class="modal-overlay" id="modalConferma" hidden>
+  <div class="modal-box">
+    <div class="modal-title">⚠️ Conferma Invio</div>
+    <p class="modal-text">Sicuro di voler inviare <strong id="modalCount"></strong> rapportin<span id="modalPlural">i</span>?</p>
+    <p class="modal-sub">Controlla che tutti i dati siano corretti prima di procedere.</p>
+    <div class="modal-buttons">
+      <button class="btn modal-btn-cancel" onclick="chiudiModal()">✕ Annulla</button>
+      <button class="btn btn-send modal-btn-ok" onclick="chiudiModal(); inviaRapportini();">✔ Sì, Invia</button>
+    </div>
   </div>
 </div>
 
